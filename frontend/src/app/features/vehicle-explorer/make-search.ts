@@ -1,4 +1,4 @@
-import { Make } from '../vehicle.models';
+import { Make } from '../../core/models/vehicle.models';
 
 /**
  * Suggested before the user types anything. vPIC lists ~12k makes, most of them small trailer and

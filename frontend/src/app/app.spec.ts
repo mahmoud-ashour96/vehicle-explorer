@@ -4,25 +4,24 @@ import { TestBed } from '@angular/core/testing';
 import { App } from './app';
 
 describe('App', () => {
-  beforeEach(async () => {
+  it('renders the header and the explorer page', async () => {
     await TestBed.configureTestingModule({
       imports: [App],
       providers: [provideHttpClient(), provideHttpClientTesting()],
     }).compileComponents();
-  });
 
-  it('renders the page heading and the initial empty state', async () => {
     const fixture = TestBed.createComponent(App);
-    // Not whenStable(): pending resource requests keep the app unstable until they are flushed.
-    fixture.detectChanges();
     const http = TestBed.inject(HttpTestingController);
+
+    // Pending requests keep the app "unstable", so flush them before awaiting whenStable().
+    fixture.detectChanges();
     http.expectOne('/api/makes').flush([]);
     http.expectOne('/api/model-years').flush([2026]);
     await fixture.whenStable();
 
     const page = fixture.nativeElement as HTMLElement;
-    expect(page.querySelector('h1')?.textContent).toContain('Vehicle Explorer');
-    expect(page.textContent).toContain('Pick a make and a model year');
+    expect(page.querySelector('.brand-name')?.textContent).toContain('Vehicle Explorer');
+    expect(page.querySelector('app-vehicle-explorer')).not.toBeNull();
     http.verify();
   });
 });

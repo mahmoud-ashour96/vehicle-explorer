@@ -1,4 +1,4 @@
-// Mirrors the API contracts in backend/VehicleExplorer.Api/Models/CatalogModels.cs.
+// Match the DTOs returned by the API (backend/src/VehicleExplorer.Application/Dtos).
 
 export interface Make {
   id: number;

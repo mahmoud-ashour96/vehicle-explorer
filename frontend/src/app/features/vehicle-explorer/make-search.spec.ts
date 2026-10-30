@@ -1,4 +1,4 @@
-import { Make } from '../vehicle.models';
+import { Make } from '../../core/models/vehicle.models';
 import { POPULAR_MAKES, searchMakes } from './make-search';
 
 const makes: Make[] = [

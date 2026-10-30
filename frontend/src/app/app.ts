@@ -1,6 +1,6 @@
 import { Component } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
-import { VehicleExplorer } from './vehicles/vehicle-explorer/vehicle-explorer';
+import { VehicleExplorer } from './features/vehicle-explorer/vehicle-explorer';
 
 @Component({
   selector: 'app-root',
