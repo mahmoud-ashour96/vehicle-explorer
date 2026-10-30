@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="VehicleExplorer.Api.Tests/VehicleExplorer.Api.Tests.csproj" />
+  <Project Path="VehicleExplorer.Api/VehicleExplorer.Api.csproj" />
+</Solution>
