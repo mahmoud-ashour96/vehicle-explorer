@@ -1,6 +1,22 @@
-@VehicleExplorer.Api_HostAddress = http://localhost:5226
+@host = http://localhost:5226
 
-GET {{VehicleExplorer.Api_HostAddress}}/weatherforecast/
-Accept: application/json
+### All makes
+GET {{host}}/api/makes
 
-###
+### Model years accepted by the API
+GET {{host}}/api/model-years
+
+### Vehicle types for Honda (474)
+GET {{host}}/api/makes/474/vehicle-types
+
+### Honda models for 2015
+GET {{host}}/api/makes/474/models?year=2015
+
+### Honda passenger cars for 2015
+GET {{host}}/api/makes/474/models?year=2015&vehicleType=Passenger%20Car
+
+### Validation error: year out of range
+GET {{host}}/api/makes/474/models?year=1900
+
+### Health check
+GET {{host}}/health
