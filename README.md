@@ -5,12 +5,12 @@ Data comes from the [NHTSA vPIC API](https://vpic.nhtsa.dot.gov/api/).
 
 **Live demo:** _AWS link goes here_
 
-| Layer    | Tech                                                                         |
-| -------- | ---------------------------------------------------------------------------- |
-| Backend  | .NET 10 ASP.NET Core Web API (controllers), typed `HttpClient` + resilience, in-memory cache |
-| Frontend | Angular 22 (standalone, zoneless, signals, `httpResource`), Angular Material |
-| Tests    | xUnit + `WebApplicationFactory` (API), Vitest (Angular)                      |
-| Delivery | Docker (single image), GitHub Actions → GHCR, AWS EC2 (Free Tier)            |
+| Layer    | Tech                                                                                      |
+| -------- | ----------------------------------------------------------------------------------------- |
+| Backend  | .NET 10 ASP.NET Core Web API, onion layers (Domain / Application / Infrastructure / Api) |
+| Frontend | Angular 22 (standalone, zoneless, signals + `rxResource`), Angular Material               |
+| Tests    | xUnit + `WebApplicationFactory` (backend), Vitest (frontend)                              |
+| Delivery | Docker (single image), GitHub Actions → GHCR, AWS EC2 (Free Tier)                         |
 
 Design decisions, trade-offs and how AI was used are in [DECISIONS.md](DECISIONS.md).
 
@@ -37,15 +37,15 @@ Stop it with `Ctrl+C`, then `docker compose down`.
 Prerequisites:
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
-- [Node.js 24](https://nodejs.org/) (`frontend/.nvmrc` pins it; with nvm run `nvm use` in `frontend/`)
+- [Node.js 24](https://nodejs.org/) (`frontend/.nvmrc` pins it; with nvm, run `nvm use` in `frontend/`)
 
 **1. Start the API** (terminal 1):
 
 ```bash
-dotnet run --project backend/VehicleExplorer.Api
+dotnet run --project backend/src/VehicleExplorer.Api
 ```
 
-The API listens on http://localhost:5226. Check it with http://localhost:5226/health. It should say `Healthy`.
+The API listens on http://localhost:5226. Open http://localhost:5226/health to check it; it should say `Healthy`.
 
 **2. Start the Angular dev server** (terminal 2):
 
@@ -55,7 +55,7 @@ npm ci
 npm start
 ```
 
-Open **http://localhost:4200**. The dev server proxies `/api/*` to the API (see `frontend/proxy.conf.json`), so no CORS setup is needed.
+Open **http://localhost:4200**. The dev server forwards `/api/*` to the API (see `frontend/proxy.conf.json`), so no CORS setup is needed.
 
 ---
 
@@ -76,17 +76,17 @@ CI runs both suites and the Docker build on every push and pull request (`.githu
 
 ## API
 
-| Method | Route                                                  | Description                                  |
-| ------ | ------------------------------------------------------ | -------------------------------------------- |
-| GET    | `/api/makes`                                           | All makes, sorted by name                    |
-| GET    | `/api/model-years`                                     | Model years the API accepts, newest first    |
-| GET    | `/api/makes/{makeId}/vehicle-types`                    | Vehicle types for a make                     |
-| GET    | `/api/makes/{makeId}/models?year={year}`               | Models for a make and year                   |
-| GET    | `/api/makes/{makeId}/models?year={year}&vehicleType=…` | Same, filtered by a vehicle type name        |
-| GET    | `/health`                                              | Liveness check                               |
+| Method | Route                                                  | Description                               |
+| ------ | ------------------------------------------------------ | ----------------------------------------- |
+| GET    | `/api/makes`                                           | All makes, sorted by name                 |
+| GET    | `/api/model-years`                                     | Supported model years, newest first       |
+| GET    | `/api/makes/{makeId}/vehicle-types`                    | Vehicle types for a make                  |
+| GET    | `/api/makes/{makeId}/models?year={year}`               | Models for a make and year                |
+| GET    | `/api/makes/{makeId}/models?year={year}&vehicleType=…` | Same, filtered by a vehicle type name     |
+| GET    | `/health`                                              | Health check                              |
 
-Errors are returned as [ProblemDetails](https://www.rfc-editor.org/rfc/rfc9457): `400` for invalid input, `502` when vPIC is unavailable.
-`backend/VehicleExplorer.Api/VehicleExplorer.Api.http` has ready-made requests. In Development, the OpenAPI document is at `/openapi/v1.json`.
+Errors use [ProblemDetails](https://www.rfc-editor.org/rfc/rfc9457): `400` for invalid input, `502` when vPIC is unavailable.
+`backend/src/VehicleExplorer.Api/VehicleExplorer.Api.http` has ready-made requests. In Development, the OpenAPI document is at `/openapi/v1.json`.
 
 ---
 
@@ -94,20 +94,23 @@ Errors are returned as [ProblemDetails](https://www.rfc-editor.org/rfc/rfc9457):
 
 ```
 backend/
-  VehicleExplorer.Api/
-    Controllers/        HTTP endpoints and input validation
-    Services/           VehicleCatalog (caching) and startup cache warm-up
-    Vpic/               Typed client for NHTSA vPIC, its DTOs and error type
-    Models/             Public API contracts and the model-year rule
-    Infrastructure/     Maps upstream failures to 502 ProblemDetails
-  VehicleExplorer.Api.Tests/
-frontend/
-  src/app/
-    vehicles/           Page component, signal store, make autocomplete
-    shared/             Error banner
-deploy/                 EC2 user-data and update scripts
-Dockerfile              Multi-stage: Angular build -> .NET publish -> aspnet runtime
+  src/
+    VehicleExplorer.Domain/           Entities (Make, VehicleType, VehicleModel) and the model-year rule
+    VehicleExplorer.Application/      DTOs, IVehicleService / VehicleService (validation, caching, mapping),
+                                      IVehicleDataSource interface, application exceptions
+    VehicleExplorer.Infrastructure/   VpicVehicleDataSource: calls NHTSA vPIC, maps its JSON to entities
+    VehicleExplorer.Api/              Controllers, global exception handler, startup cache warm-up
+  tests/
+    VehicleExplorer.Tests/            Domain, Application, Infrastructure and Api tests
+frontend/src/app/
+  core/                               Models and VehicleService (HttpClient)
+  features/vehicle-explorer/          The page: search, vehicle types, model results
+  shared/                             Error alert component and error-message helper
+deploy/                               EC2 user data and update scripts
+Dockerfile                            Multi-stage: Angular build -> .NET publish -> aspnet runtime
 ```
+
+Dependencies point inwards: `Api → Infrastructure → Application → Domain`.
 
 ---
 
@@ -115,9 +118,9 @@ Dockerfile              Multi-stage: Angular build -> .NET publish -> aspnet run
 
 CI publishes the image to `ghcr.io/<owner>/vehicle-explorer` from `main`. The live demo runs that image on an EC2 `t3.micro` (Free Tier):
 
-1. In GitHub, open the repository's **Packages → vehicle-explorer → Package settings** and set the visibility to **Public**, so EC2 can pull the image without credentials.
-2. Launch an EC2 instance: Amazon Linux 2023, `t3.micro`, a security group that allows inbound **HTTP (80)** only. Attach an IAM role with `AmazonSSMManagedInstanceCore`, so you can connect with Session Manager instead of opening SSH.
-3. Paste `deploy/ec2-user-data.sh` into **Advanced details → User data**, with `OWNER` replaced by your GitHub username.
+1. In GitHub, open **Packages → vehicle-explorer → Package settings** and set the visibility to **Public**, so EC2 can pull the image without credentials.
+2. Launch an EC2 instance: Amazon Linux 2023, `t3.micro`, with a security group that allows inbound **HTTP (80)** only. Attach an IAM role with `AmazonSSMManagedInstanceCore`, so you can connect with Session Manager instead of opening SSH.
+3. Paste `deploy/ec2-user-data.sh` into **Advanced details → User data**, after replacing `OWNER` with your GitHub username.
 4. After a minute or two, open `http://<instance-public-dns>`.
 
 To roll out a new version, connect with Session Manager and run `deploy/update.sh`.
