@@ -8,4 +8,4 @@
 **/obj
 **/*.user
 **/TestResults
-backend/VehicleExplorer.Api.Tests
+backend/tests

@@ -13,10 +13,14 @@ RUN npx ng build --configuration production
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS api
 WORKDIR /src
 COPY nuget.config ./
-COPY backend/VehicleExplorer.Api/VehicleExplorer.Api.csproj backend/VehicleExplorer.Api/
-RUN dotnet restore backend/VehicleExplorer.Api/VehicleExplorer.Api.csproj
-COPY backend/VehicleExplorer.Api/ backend/VehicleExplorer.Api/
-RUN dotnet publish backend/VehicleExplorer.Api/VehicleExplorer.Api.csproj \
+# Copy only the project files first, so the restore layer is cached until dependencies change.
+COPY backend/src/VehicleExplorer.Domain/VehicleExplorer.Domain.csproj backend/src/VehicleExplorer.Domain/
+COPY backend/src/VehicleExplorer.Application/VehicleExplorer.Application.csproj backend/src/VehicleExplorer.Application/
+COPY backend/src/VehicleExplorer.Infrastructure/VehicleExplorer.Infrastructure.csproj backend/src/VehicleExplorer.Infrastructure/
+COPY backend/src/VehicleExplorer.Api/VehicleExplorer.Api.csproj backend/src/VehicleExplorer.Api/
+RUN dotnet restore backend/src/VehicleExplorer.Api/VehicleExplorer.Api.csproj
+COPY backend/src/ backend/src/
+RUN dotnet publish backend/src/VehicleExplorer.Api/VehicleExplorer.Api.csproj \
     --configuration Release --no-restore --output /app
 
 # ---- 3. Runtime ----

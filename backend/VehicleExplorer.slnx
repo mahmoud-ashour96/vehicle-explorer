@@ -1,4 +1,11 @@
 <Solution>
-  <Project Path="VehicleExplorer.Api.Tests/VehicleExplorer.Api.Tests.csproj" />
-  <Project Path="VehicleExplorer.Api/VehicleExplorer.Api.csproj" />
+  <Folder Name="/src/">
+    <Project Path="src/VehicleExplorer.Domain/VehicleExplorer.Domain.csproj" />
+    <Project Path="src/VehicleExplorer.Application/VehicleExplorer.Application.csproj" />
+    <Project Path="src/VehicleExplorer.Infrastructure/VehicleExplorer.Infrastructure.csproj" />
+    <Project Path="src/VehicleExplorer.Api/VehicleExplorer.Api.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/VehicleExplorer.Tests/VehicleExplorer.Tests.csproj" />
+  </Folder>
 </Solution>
