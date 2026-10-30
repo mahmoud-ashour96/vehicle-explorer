@@ -1,0 +1,11 @@
+**/.git
+**/.vs
+**/.vscode
+**/.angular
+**/node_modules
+**/dist
+**/bin
+**/obj
+**/*.user
+**/TestResults
+backend/VehicleExplorer.Api.Tests

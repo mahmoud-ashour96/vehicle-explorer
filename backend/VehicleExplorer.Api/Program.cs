@@ -35,14 +35,21 @@ if (app.Environment.IsDevelopment())
 }
 
 // In the Docker image the built Angular app lives in wwwroot, so one container serves both UI and API.
+// Angular emits content-hashed file names, so those can be cached for a year; index.html must
+// always be revalidated so a new deployment is picked up immediately.
+var spaFiles = new StaticFileOptions
+{
+    OnPrepareResponse = ctx => ctx.Context.Response.Headers.CacheControl =
+        ctx.File.Name == "index.html" ? "no-cache" : "public,max-age=31536000,immutable",
+};
 app.UseDefaultFiles();
-app.UseStaticFiles();
+app.UseStaticFiles(spaFiles);
 
 app.MapControllers();
 app.MapHealthChecks("/health");
 
 // Unknown /api routes are real 404s; everything else is an Angular client-side route.
 app.MapFallback("api/{**path}", () => Results.NotFound());
-app.MapFallbackToFile("index.html");
+app.MapFallbackToFile("index.html", spaFiles);
 
 app.Run();
