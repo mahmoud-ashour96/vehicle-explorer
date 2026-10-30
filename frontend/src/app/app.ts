@@ -1,11 +1,11 @@
-import { Component, signal } from '@angular/core';
+import { Component } from '@angular/core';
+import { MatIconModule } from '@angular/material/icon';
+import { VehicleExplorer } from './vehicles/vehicle-explorer/vehicle-explorer';
 
 @Component({
-  imports: [],
   selector: 'app-root',
-  styleUrl: './app.scss',
+  imports: [MatIconModule, VehicleExplorer],
   templateUrl: './app.html',
+  styleUrl: './app.scss',
 })
-export class App {
-  protected readonly title = signal('vehicle-explorer');
-}
+export class App {}

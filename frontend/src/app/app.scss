@@ -1,0 +1,54 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.container {
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 16px;
+  box-sizing: border-box;
+}
+
+.hero {
+  padding: 40px 0 32px;
+  background: var(--mat-sys-primary-container);
+  color: var(--mat-sys-on-primary-container);
+
+  h1 {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 0 0 8px;
+    font: var(--mat-sys-headline-medium);
+
+    mat-icon {
+      width: 36px;
+      height: 36px;
+      font-size: 36px;
+    }
+  }
+
+  p {
+    margin: 0;
+    font: var(--mat-sys-body-large);
+  }
+}
+
+main {
+  flex: 1;
+  padding-top: 24px;
+  padding-bottom: 32px;
+}
+
+footer {
+  padding-bottom: 24px;
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-body-small);
+
+  a {
+    color: var(--mat-sys-primary);
+  }
+}

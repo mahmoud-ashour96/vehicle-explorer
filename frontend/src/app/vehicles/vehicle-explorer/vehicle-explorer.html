@@ -1,0 +1,89 @@
+<section class="search card" aria-label="Search">
+  <app-make-autocomplete
+    class="make"
+    [makes]="store.makeList()"
+    [loading]="store.makes.isLoading()"
+    [selected]="store.make()"
+    (selectedChange)="store.selectMake($event)"
+  />
+
+  <mat-form-field class="year" appearance="outline" subscriptSizing="dynamic">
+    <mat-label>Model year</mat-label>
+    <mat-select [value]="store.year()" (selectionChange)="store.selectYear($event.value)">
+      @for (year of store.yearList(); track year) {
+        <mat-option [value]="year">{{ year }}</mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+
+  @if (store.makes.error(); as error) {
+    <app-error-banner class="full-row" [error]="error" (retry)="store.makes.reload()" />
+  } @else if (store.modelYears.error(); as error) {
+    <app-error-banner class="full-row" [error]="error" (retry)="store.modelYears.reload()" />
+  }
+</section>
+
+@if (store.make(); as make) {
+  <section class="card" aria-labelledby="types-title">
+    <h2 id="types-title" class="section-title">Vehicle types for {{ make.name }}</h2>
+
+    @if (store.vehicleTypes.error(); as error) {
+      <app-error-banner [error]="error" (retry)="store.vehicleTypes.reload()" />
+    } @else if (store.vehicleTypes.isLoading()) {
+      <mat-progress-bar mode="indeterminate" aria-label="Loading vehicle types" />
+    } @else if (store.vehicleTypes.value().length === 0) {
+      <p class="muted">NHTSA lists no vehicle types for this make.</p>
+    } @else {
+      <mat-chip-listbox
+        aria-label="Filter models by vehicle type"
+        [value]="store.vehicleType() ?? ''"
+        (change)="onVehicleTypeChange($event)"
+      >
+        <mat-chip-option value="">All types</mat-chip-option>
+        @for (type of store.vehicleTypes.value(); track type.id) {
+          <mat-chip-option [value]="type.name">{{ type.name }}</mat-chip-option>
+        }
+      </mat-chip-listbox>
+    }
+  </section>
+}
+
+<section class="results" aria-live="polite" aria-labelledby="results-title">
+  @if (!store.canShowModels()) {
+    <div class="empty-state">
+      <mat-icon aria-hidden="true">directions_car</mat-icon>
+      <p id="results-title">Pick a make and a model year to see its vehicle types and models.</p>
+    </div>
+  } @else if (store.models.error(); as error) {
+    <app-error-banner [error]="error" (retry)="store.models.reload()" />
+  } @else if (store.models.isLoading()) {
+    <mat-progress-bar mode="indeterminate" aria-label="Loading models" />
+  } @else if (store.models.value().length === 0) {
+    <div class="empty-state">
+      <mat-icon aria-hidden="true">search_off</mat-icon>
+      <p id="results-title">
+        No {{ store.vehicleType() ?? '' }} models found for {{ store.make()?.name }} in
+        {{ store.year() }}.
+      </p>
+    </div>
+  } @else {
+    <header class="results-header">
+      <h2 id="results-title" class="section-title">
+        {{ store.models.value().length }}
+        {{ store.models.value().length === 1 ? 'model' : 'models' }}
+      </h2>
+      <span class="muted">
+        {{ store.make()?.name }} · {{ store.year() }} · {{ store.vehicleType() ?? 'All types' }}
+      </span>
+    </header>
+
+    <ul class="model-grid">
+      @for (model of store.models.value(); track model.id) {
+        <li class="model-card">
+          <span class="model-name">{{ model.name }}</span>
+          <span class="muted">{{ store.make()?.name }} · {{ store.year() }}</span>
+        </li>
+      }
+    </ul>
+  }
+</section>
