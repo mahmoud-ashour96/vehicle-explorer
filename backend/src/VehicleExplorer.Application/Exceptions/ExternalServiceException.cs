@@ -1,7 +1,7 @@
 namespace VehicleExplorer.Application.Exceptions;
 
 /// <summary>
-/// The external vehicle data source could not be reached or returned unusable data.
+/// The external vehicle data source failed or returned unusable data. Returned as 502.
 /// </summary>
 public class ExternalServiceException : Exception
 {

@@ -1,7 +1,7 @@
 namespace VehicleExplorer.Application.Exceptions;
 
 /// <summary>
-/// The request breaks a business rule (for example an unsupported model year).
+/// The request breaks a business rule, for example an unsupported model year. Returned as 400.
 /// </summary>
 public class ValidationException : Exception
 {
@@ -11,5 +11,5 @@ public class ValidationException : Exception
         Errors = new Dictionary<string, string[]> { [propertyName] = [errorMessage] };
     }
 
-    public IDictionary<string, string[]> Errors { get; }
+    public Dictionary<string, string[]> Errors { get; }
 }

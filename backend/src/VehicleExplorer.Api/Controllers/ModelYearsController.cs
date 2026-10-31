@@ -5,7 +5,6 @@ namespace VehicleExplorer.Api.Controllers;
 
 [ApiController]
 [Route("api/model-years")]
-[Produces("application/json")]
 public class ModelYearsController : ControllerBase
 {
     private readonly IVehicleService _vehicleService;
@@ -15,11 +14,8 @@ public class ModelYearsController : ControllerBase
         _vehicleService = vehicleService;
     }
 
-    /// <summary>
-    /// Gets the supported model years, newest first.
-    /// </summary>
+    // GET api/model-years
     [HttpGet]
-    [ProducesResponseType<IReadOnlyList<int>>(StatusCodes.Status200OK)]
     public ActionResult<IReadOnlyList<int>> GetModelYears()
     {
         return Ok(_vehicleService.GetModelYears());

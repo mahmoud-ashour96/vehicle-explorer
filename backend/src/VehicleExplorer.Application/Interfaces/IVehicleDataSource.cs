@@ -3,8 +3,7 @@ using VehicleExplorer.Domain.Entities;
 namespace VehicleExplorer.Application.Interfaces;
 
 /// <summary>
-/// Where vehicle data comes from. Implemented in Infrastructure (currently the NHTSA vPIC API).
-/// Implementations throw <see cref="Exceptions.ExternalServiceException"/> when the source is unavailable.
+/// Where vehicle data comes from. Implemented in Infrastructure by the NHTSA vPIC client.
 /// </summary>
 public interface IVehicleDataSource
 {

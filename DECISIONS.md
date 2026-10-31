@@ -9,97 +9,87 @@ Browser (Angular 22)
 VehicleExplorer.Api             MakesController, ModelYearsController, GlobalExceptionHandler
    │
    ▼
-VehicleExplorer.Application     VehicleService: validation, caching, entity → DTO mapping
+VehicleExplorer.Application     VehicleService: year validation, caching, entity → DTO mapping
    │  IVehicleDataSource (interface)
    ▼
-VehicleExplorer.Infrastructure  VpicVehicleDataSource: typed HttpClient + resilience
+VehicleExplorer.Infrastructure  VpicVehicleDataSource: HttpClient calls to vPIC
    │
    ▼
 NHTSA vPIC API
 
-VehicleExplorer.Domain          Entities + model-year rule (referenced by all layers, depends on nothing)
+VehicleExplorer.Domain          Entities + model-year rule (used by all layers, depends on nothing)
 ```
 
 ## Key decisions and trade-offs
 
+### Simple first
+The brief asked for a small app, and I expect to change it live in the interview, so I kept only what the requirements need. Every class has one obvious job, and adding a feature means touching one place per layer: an endpoint in a controller, a method on `VehicleService`, and a vPIC call in `VpicVehicleDataSource`.
+
+I deliberately left out things a production service would add, and listed them under [Next steps](#next-steps): retries and a circuit breaker, a startup cache warm-up, response compression, HTTP caching headers, health checks and OpenAPI.
+
 ### A light onion architecture
-- There are four projects, and dependencies point inwards (`Api → Infrastructure → Application → Domain`).
-- **Application** owns the `IVehicleDataSource` interface. **Infrastructure** implements it for vPIC. Swapping the data source, or faking it in tests, touches nothing else.
-- I deliberately left out MediatR, CQRS, repositories and AutoMapper. With four read-only endpoints they would add ceremony without adding value. Mapping is a few explicit `ToDto()` extension methods.
-- **Trade-off:** domain entities and DTOs currently have the same shape, which looks like duplication. I kept them separate so the API contract can change without touching the domain, and the other way round.
+- Four projects, with dependencies pointing inwards: `Api → Infrastructure → Application → Domain`.
+- **Application** owns the `IVehicleDataSource` interface, and **Infrastructure** implements it for vPIC. Replacing the data source, or faking it in tests, touches nothing else.
+- No MediatR, CQRS, repositories or AutoMapper. With four read-only endpoints they would add ceremony without value. Mapping is a few explicit `ToDto()` extension methods.
+- **Trade-off:** domain entities and DTOs currently have the same shape. I kept them separate so the API contract and the domain can change independently.
 
 ### DTOs as plain classes
-API contracts (`MakeDto`, `VehicleTypeDto`, `VehicleModelDto`) are classes with `{ get; set; }` properties. This matches what most .NET teams use for DTOs and serializes the same as records would.
+API contracts (`MakeDto`, `VehicleTypeDto`, `VehicleModelDto`) are classes with `{ get; set; }` properties, the way most .NET teams write DTOs.
 
-### Business rules live in the Application layer
-- `VehicleService` validates input and throws `ValidationException`. The API's `GlobalExceptionHandler` turns that into **400 ValidationProblemDetails**. Controllers stay thin: they take parameters and return results.
-- **Model year** must fall between **1981** (when the 17-character VIN standard begins) and **next year** (next year's models are already on sale). The rule lives in `Domain/Rules/ModelYears.cs` and is exposed as `/api/model-years`, so the UI dropdown and the validation can't disagree.
-- **Vehicle type** goes into vPIC's URL **path**, so it is checked against an allow-list (letters, digits, spaces, `( ) -`, up to 100 characters) and URL-escaped. Input like `../../x` is rejected.
-- vPIC matches vehicle types partially (`car` also matched "Passenger Car"), so the UI sends the exact names returned by the vehicle-types endpoint.
+### Validation and errors
+- **Model year** must be between **1981** (when the 17-character VIN standard begins) and **next year** (next year's models are already on sale). The rule lives in `Domain/Rules/ModelYears.cs`, and `/api/model-years` exposes it, so the UI dropdown and the validation always agree.
+- `VehicleService` throws `ValidationException` for an invalid year. `GlobalExceptionHandler` maps it to **400**, and maps vPIC failures (`ExternalServiceException`) to **502**. Controllers contain no error handling of their own.
+- The vehicle type is URL-escaped before it goes into vPIC's URL path. vPIC matches types partially (`car` also matched "Passenger Car"), so the UI sends the exact names returned by the vehicle-types endpoint.
 
-### The backend proxies vPIC instead of the browser calling it
-- **Why:** caching, one place for resilience and error handling, and a stable contract (`{ id, name }` instead of vPIC's `Make_ID` / `Model_Name` envelope).
-- vPIC quirks (blank names, duplicate rows, HTML error pages) are cleaned up in Infrastructure, so they never reach the domain.
+### The backend calls vPIC, not the browser
+- **Why:** one place for caching and error handling, and a clean contract (`{ id, name }` instead of vPIC's `Make_ID` / `Model_Name` envelope).
+- I checked the real data and clean up only what actually occurs: about 80 make names have extra spaces (they are trimmed), and some model lists repeat the same model (they are de-duplicated). For example, Ford 2020 returned 34 rows for 25 models.
 
-### Caching: `IMemoryCache` with a size limit, plus a startup warm-up
-- `getallmakes` returns **12,416 makes (~600 KB) and took ~3.4 s** when I measured it. Makes and vehicle types are cached for 24 h, models for 6 h. A cached models request took ~3 ms; uncached it took ~270 ms.
-- `SizeLimit` caps the number of cache entries, so random make/year/type combinations can't grow memory without limit. Failed calls are never cached.
-- A `BackgroundService` loads the makes list at startup, so the first visitor doesn't wait 3 s.
-- Responses also send `Cache-Control: max-age=3600`, and Brotli/gzip compression cuts the makes payload to ~173 KB.
-- **Trade-off:** the cache is per instance. That's fine for one container. For several instances I would use `HybridCache` with Redis.
+### Caching: one `IMemoryCache`, 6 hours
+- This is the one extra beyond the brief, kept for a reason: `getallmakes` returns **12,416 makes (~600 KB)** and took **2–3 s**, once **44 s**, when I measured it. With the cache, the repeat request took ~30 ms.
+- `GetOrCreateAsync` with one duration for everything. Failed calls are not cached, because an exception means nothing is stored.
+- **Trade-off:** the first request after startup, or after expiry, still waits for vPIC. The cache is also per instance, which is fine for one container.
 
-### Failure handling
-- `AddStandardResilienceHandler()` adds retries with backoff, timeouts and a circuit breaker to the vPIC HttpClient.
-- Every vPIC failure (network error, non-2xx status, non-JSON body, timeout, open circuit) becomes an `ExternalServiceException`, which the handler returns as **502 ProblemDetails**. Unknown `/api/*` routes return a real 404 instead of the Angular `index.html`.
-- `VpicOptions` is bound from configuration and validated at startup, so a missing base URL fails fast instead of failing on the first request.
+### Make search runs in the browser
+- The client downloads the make list once and filters it locally. Prefix matches rank first, and the list is capped at 50 suggestions. Search is instant, with no request per keystroke.
+- With an empty search box the app suggests **popular makes**. vPIC's alphabetical list starts with entries like "#1 ALPINE CUSTOMS", which is not a useful starting point.
 
-### Make search runs in the browser, over the full list
-- The client downloads the make list once (compressed, and cached by the browser for an hour) and filters it locally. Prefix matches rank first, and the list is capped at 50 suggestions.
-- **Why:** search is instant, with no request per keystroke and no debounce or race handling.
-- **Trade-off:** a ~173 KB first load. A server-side `?search=` endpoint would be the next step if the list grew much larger.
-- With an empty search box, the app suggests **popular makes**, also offered as quick-pick buttons. vPIC's alphabetical list starts with entries like "#1 ALPINE CUSTOMS", which is not a useful starting point.
-
-### Angular: a plain service plus signals, kept simple
-- `VehicleService` is an ordinary `HttpClient` service that returns Observables, the pattern most Angular developers know.
-- The page component holds the selection as signals and loads data with `rxResource` (stable in Angular 22). When the make or year changes, the matching resource reloads automatically and **cancels the previous request**, so a slow old response can't overwrite a newer one. There is no separate store or state library.
-- Angular 22 defaults are used as they come: standalone components, zoneless change detection, OnPush.
-- The UI shows loading skeletons, guided empty states ("Find a vehicle", "Now pick a model year", "No models found"), and an error alert with **Try again** that uses the API's `detail` message.
+### Angular: a plain service plus signals
+- `VehicleService` is an ordinary `HttpClient` service that returns Observables.
+- The page component keeps the selection in signals and loads data with `rxResource` (stable in Angular 22). When the make or year changes, the data reloads and the previous request is **cancelled**, so a slow old response can't overwrite a newer one. There is no separate store.
+- The UI shows loading skeletons, guided empty states, and an error alert with **Try again**.
 
 ### UI library: Angular Material, not PrimeNG
-- I considered PrimeNG. Its recent releases (including 20–22) are now under a commercial **PrimeUI License**, which needs a license key; without one, the app shows a license banner. A key would also have to sit in the frontend code of a public repository.
-- Angular Material is MIT-licensed, maintained by the Angular team, and covers what this page needs: an accessible autocomplete, select and chips.
-- **Trade-off:** ~123 KB transferred for the initial bundle. I raised the bundle warning budget to 750 KB raw to match.
+- Recent PrimeNG releases (including 20–22) are under a commercial **PrimeUI License** that requires a license key. Without a key the app shows a license banner, and a key would have to sit in the frontend code of a public repository.
+- Angular Material is MIT-licensed, maintained by the Angular team, and has the accessible autocomplete, select and chips this page needs.
 
 ### One container for UI and API
-- The Dockerfile builds Angular, publishes .NET, and copies the Angular output into `wwwroot`. Same origin, so there is no CORS setup, one artifact to deploy, and one health check.
-- Hashed assets get `immutable` caching for a year; `index.html` is `no-cache`, so new deployments show up immediately.
-- **Trade-off:** the UI can't be scaled or CDN-hosted on its own. At larger scale I would host the static files on S3 + CloudFront.
+- The Dockerfile builds Angular, publishes .NET, and copies the Angular output into `wwwroot`. Same origin means no CORS setup, and there is one artifact to deploy.
+- **Trade-off:** the UI can't be scaled or served from a CDN on its own.
 
 ### Delivery and AWS
-- GitHub Actions runs both test suites and builds the image. On `main` it also pushes the image to GHCR using the built-in `GITHUB_TOKEN`, so no secrets are stored.
-- An EC2 `t3.micro` (Free Tier) pulls and runs the image. Building on the instance would be risky with only 1 GB of RAM.
-- The security group opens **only port 80**, and access to the instance goes through **SSM Session Manager**, so there is no SSH port and no key pair. No credentials are in the repository.
+- GitHub Actions runs both test suites and builds the image. On `main` it pushes the image to GHCR using the built-in `GITHUB_TOKEN`, so no secrets are stored.
+- An EC2 `t3.micro` (Free Tier) pulls and runs the image. Building on the instance would be risky with 1 GB of RAM.
+- The security group opens **only port 80**. Access to the instance goes through **SSM Session Manager**, so there is no SSH port and no key pair. No credentials are in the repository.
 
 ## Assumptions
-- Vehicle types belong to a make, not to a make and year, because vPIC's endpoint takes no year. They appear as soon as a make is picked and act as an optional filter on the models.
-- Make and model names are shown as vPIC returns them (makes are uppercase). Title-casing would mangle names like "BMW".
+- Vehicle types belong to a make, not to a make and year, because vPIC's endpoint takes no year. They appear as soon as a make is chosen and act as an optional filter on the models.
+- Names are shown as vPIC returns them (makes are uppercase). Title-casing would mangle names like "BMW".
 - No authentication or persistence is needed. All data is public and read-only.
 
 ## How I used AI
 
-I built this with **Claude Code** (Claude Opus) as a pair programmer. It scaffolded the projects, drafted most of the code and tests, and drafted these docs. I set the direction (for example the onion structure, DTO classes and a simpler frontend), reviewed every change, ran the app against the live API, and made the calls on structure and trade-offs.
+I built this with **Claude Code** (Claude Opus) as a pair programmer. It scaffolded the projects, drafted most of the code and tests, and drafted these docs. I set the direction, reviewed every change, ran the app against the live API, and made the structural calls. One of those calls was cutting the AI's first version down: it had added retries, cache warm-up, compression and other production extras that the brief didn't ask for and that made the code harder to change.
 
 **What it got wrong, and how it was fixed:**
 
-1. **An Angular test that hung.** The first component test awaited `fixture.whenStable()` *before* flushing the mocked HTTP requests, and timed out after 5 s. In Angular 22, pending resource requests count as pending work, so the app is never "stable" until they are answered. The fix: run change detection, flush the requests, and only then await stability. The specs now have a comment explaining this.
-2. **`[ResponseCache(VaryByQueryKeys = …)]` without the middleware.** The AI added `VaryByQueryKeys` to the models endpoint. That property only works with the Response Caching middleware; without it, ASP.NET Core throws at request time. I caught it in review and removed it. A plain `Cache-Control` header is enough, because browsers already cache per URL, including the query string.
-3. **A dependency in the wrong package.** When moving caching into the Application layer, the AI referenced `Microsoft.Extensions.Caching.Abstractions` but called `AddMemoryCache()`, which lives in `Microsoft.Extensions.Caching.Memory`. It was fixed before the first build.
-4. **Smaller type errors**, which the compiler caught: an HTTP params object built as `{ year, vehicleType: undefined }` doesn't satisfy Angular's params type, and an app initializer returned a value where `void` was expected.
+1. **An Angular test that hung.** The first component test awaited `fixture.whenStable()` *before* flushing the mocked HTTP requests, and timed out after 5 s. In Angular 22, pending resource requests count as pending work, so the app is never "stable" until they are answered. The fix: run change detection, flush the requests, then await stability. The specs have a comment explaining why.
+2. **`[ResponseCache(VaryByQueryKeys = …)]` without the middleware.** The AI used `VaryByQueryKeys`, which only works with the Response Caching middleware; without it, ASP.NET Core throws at request time. I caught it in review before it ever ran.
+3. **A dependency in the wrong package.** The AI referenced `Microsoft.Extensions.Caching.Abstractions` but called `AddMemoryCache()`, which lives in `Microsoft.Extensions.Caching.Memory`. It was fixed before the first build.
 
 ## Next steps
-- Keep the selection in the URL query string, so results can be shared and bookmarked.
-- Add Playwright end-to-end tests for the main flow.
-- Serve over HTTPS on a custom domain (CloudFront or an ALB with ACM), and add rate limiting on `/api`.
-- Add OpenTelemetry traces and metrics: cache hit rate and vPIC latency.
-- Use `HybridCache` + Redis if the app ever runs on more than one instance.
-- Define the AWS setup as code (CDK or Terraform) instead of console steps.
+- **Resilience:** retries with backoff, a timeout and a circuit breaker on the vPIC `HttpClient` (`AddStandardResilienceHandler`).
+- **Faster first load:** warm the makes cache at startup, add response compression, and send `Cache-Control` headers.
+- **Operations:** a `/health` endpoint, OpenAPI docs, OpenTelemetry traces, and HTTPS on a custom domain.
+- **UX:** keep the selection in the URL so results can be shared; add Playwright end-to-end tests.
+- **Scale:** `HybridCache` + Redis if the app runs on more than one instance; AWS setup as code (CDK or Terraform).

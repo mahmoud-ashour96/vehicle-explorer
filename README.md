@@ -45,7 +45,7 @@ Prerequisites:
 dotnet run --project backend/src/VehicleExplorer.Api
 ```
 
-The API listens on http://localhost:5226. Open http://localhost:5226/health to check it; it should say `Healthy`.
+The API listens on http://localhost:5226. Open http://localhost:5226/api/model-years to check it; it should return a list of years.
 
 **2. Start the Angular dev server** (terminal 2):
 
@@ -83,10 +83,9 @@ CI runs both suites and the Docker build on every push and pull request (`.githu
 | GET    | `/api/makes/{makeId}/vehicle-types`                    | Vehicle types for a make                  |
 | GET    | `/api/makes/{makeId}/models?year={year}`               | Models for a make and year                |
 | GET    | `/api/makes/{makeId}/models?year={year}&vehicleType=…` | Same, filtered by a vehicle type name     |
-| GET    | `/health`                                              | Health check                              |
 
-Errors use [ProblemDetails](https://www.rfc-editor.org/rfc/rfc9457): `400` for invalid input, `502` when vPIC is unavailable.
-`backend/src/VehicleExplorer.Api/VehicleExplorer.Api.http` has ready-made requests. In Development, the OpenAPI document is at `/openapi/v1.json`.
+Errors use [ProblemDetails](https://www.rfc-editor.org/rfc/rfc9457): `400` for an invalid year, `502` when vPIC is unavailable.
+`backend/src/VehicleExplorer.Api/VehicleExplorer.Api.http` has ready-made requests.
 
 ---
 
@@ -99,7 +98,7 @@ backend/
     VehicleExplorer.Application/      DTOs, IVehicleService / VehicleService (validation, caching, mapping),
                                       IVehicleDataSource interface, application exceptions
     VehicleExplorer.Infrastructure/   VpicVehicleDataSource: calls NHTSA vPIC, maps its JSON to entities
-    VehicleExplorer.Api/              Controllers, global exception handler, startup cache warm-up
+    VehicleExplorer.Api/              Controllers, global exception handler, Program.cs
   tests/
     VehicleExplorer.Tests/            Domain, Application, Infrastructure and Api tests
 frontend/src/app/

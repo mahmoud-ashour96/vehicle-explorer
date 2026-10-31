@@ -3,7 +3,7 @@
 ### All makes
 GET {{host}}/api/makes
 
-### Model years accepted by the API
+### Supported model years
 GET {{host}}/api/model-years
 
 ### Vehicle types for Honda (474)
@@ -17,6 +17,3 @@ GET {{host}}/api/makes/474/models?year=2015&vehicleType=Passenger%20Car
 
 ### Validation error: year out of range
 GET {{host}}/api/makes/474/models?year=1900
-
-### Health check
-GET {{host}}/health

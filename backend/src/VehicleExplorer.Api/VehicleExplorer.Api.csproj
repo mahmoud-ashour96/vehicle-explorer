@@ -7,10 +7,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.14" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\VehicleExplorer.Application\VehicleExplorer.Application.csproj" />
     <ProjectReference Include="..\VehicleExplorer.Infrastructure\VehicleExplorer.Infrastructure.csproj" />
   </ItemGroup>

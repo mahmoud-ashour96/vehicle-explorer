@@ -2,7 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace VehicleExplorer.Infrastructure.Vpic;
 
-// Raw vPIC response shapes. Every vPIC endpoint wraps its data as { Count, Message, SearchCriteria, Results }.
+// vPIC response shapes. Every endpoint wraps its data as { Count, Message, SearchCriteria, Results }.
 
 internal class VpicResponse<T>
 {
@@ -20,10 +20,8 @@ internal class VpicMakeResult
 
 internal class VpicVehicleTypeResult
 {
-    [JsonPropertyName("VehicleTypeId")]
     public int VehicleTypeId { get; set; }
 
-    [JsonPropertyName("VehicleTypeName")]
     public string? VehicleTypeName { get; set; }
 }
 

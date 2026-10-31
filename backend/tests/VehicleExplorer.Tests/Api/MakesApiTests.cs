@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using VehicleExplorer.Api.BackgroundServices;
 using VehicleExplorer.Application.Dtos;
 using VehicleExplorer.Application.Interfaces;
 using VehicleExplorer.Tests.Fakes;
@@ -13,7 +12,7 @@ using VehicleExplorer.Tests.Fakes;
 namespace VehicleExplorer.Tests.Api;
 
 /// <summary>
-/// Runs requests through the real HTTP pipeline (routing, controllers, error handling) with vPIC replaced by a fake.
+/// Calls the real API in memory, with the vPIC data source replaced by a fake.
 /// </summary>
 public class MakesApiTests : IDisposable
 {
@@ -28,9 +27,6 @@ public class MakesApiTests : IDisposable
             {
                 services.RemoveAll<IVehicleDataSource>();
                 services.AddSingleton<IVehicleDataSource>(_dataSource);
-
-                // The startup warm-up would call the fake in the background and make call counts unpredictable.
-                services.Remove(services.Single(d => d.ImplementationType == typeof(MakesCacheWarmer)));
             }));
 
         _client = _factory.CreateClient();
@@ -43,19 +39,15 @@ public class MakesApiTests : IDisposable
     }
 
     [Fact]
-    public async Task GetMakes_Returns200WithSortedMakesAndCacheHeader()
+    public async Task GetMakes_ReturnsMakes()
     {
-        var response = await _client.GetAsync("/api/makes");
+        var makes = await _client.GetFromJsonAsync<List<MakeDto>>("/api/makes");
 
-        response.EnsureSuccessStatusCode();
-        Assert.Equal(TimeSpan.FromHours(1), response.Headers.CacheControl?.MaxAge);
-
-        var makes = await response.Content.ReadFromJsonAsync<List<MakeDto>>();
         Assert.Equal(["HONDA", "TOYOTA"], makes!.Select(m => m.Name));
     }
 
     [Fact]
-    public async Task GetModelYears_ReturnsNewestYearFirst()
+    public async Task GetModelYears_StartsWithNextYear()
     {
         var years = await _client.GetFromJsonAsync<List<int>>("/api/model-years");
 
@@ -63,7 +55,7 @@ public class MakesApiTests : IDisposable
     }
 
     [Fact]
-    public async Task GetModels_PassesFiltersToDataSource()
+    public async Task GetModels_PassesQueryToDataSource()
     {
         var models = await _client.GetFromJsonAsync<List<VehicleModelDto>>(
             "/api/makes/474/models?year=2015&vehicleType=Passenger%20Car");
@@ -75,35 +67,22 @@ public class MakesApiTests : IDisposable
     [Theory]
     [InlineData("/api/makes/474/models")]
     [InlineData("/api/makes/474/models?year=1900")]
-    [InlineData("/api/makes/474/models?year=2015&vehicleType=..%2F..%2Fsecret")]
-    [InlineData("/api/makes/0/vehicle-types")]
-    public async Task InvalidInput_Returns400ValidationProblem(string url)
+    public async Task GetModels_InvalidYear_Returns400(string url)
     {
         var response = await _client.GetAsync(url);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>();
-        Assert.NotEmpty(problem!.Errors);
-        Assert.Null(_dataSource.LastModelsRequest);
+        Assert.Contains("year", problem!.Errors.Keys);
     }
 
     [Fact]
-    public async Task DataSourceFailure_Returns502Problem()
+    public async Task DataSourceFailure_Returns502()
     {
         _dataSource.ShouldFail = true;
 
         var response = await _client.GetAsync("/api/makes/474/vehicle-types");
 
         Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
-        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
-        Assert.Equal("Vehicle data is temporarily unavailable", problem!.Title);
-    }
-
-    [Fact]
-    public async Task UnknownApiRoute_Returns404()
-    {
-        var response = await _client.GetAsync("/api/does-not-exist");
-
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 }

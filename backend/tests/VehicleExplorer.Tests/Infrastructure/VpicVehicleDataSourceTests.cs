@@ -1,6 +1,5 @@
 using System.Net;
 using System.Text;
-using Microsoft.Extensions.Logging.Abstractions;
 using VehicleExplorer.Application.Exceptions;
 using VehicleExplorer.Infrastructure.Vpic;
 
@@ -9,32 +8,28 @@ namespace VehicleExplorer.Tests.Infrastructure;
 public class VpicVehicleDataSourceTests
 {
     [Fact]
-    public async Task GetMakesAsync_MapsResultsTrimsNamesAndSkipsBlanks()
+    public async Task GetMakesAsync_MapsResultsAndTrimsNames()
     {
-        var (dataSource, _) = CreateDataSource(JsonResponse("""
-            {"Count":3,"Results":[
-              {"Make_ID":448,"Make_Name":" TOYOTA "},
-              {"Make_ID":1,"Make_Name":""},
-              {"Make_ID":474,"Make_Name":"HONDA"}
-            ]}
-            """));
+        var (dataSource, _) = CreateDataSource("""
+            {"Results":[{"Make_ID":448,"Make_Name":" TOYOTA "},{"Make_ID":474,"Make_Name":"HONDA"}]}
+            """);
 
         var makes = await dataSource.GetMakesAsync();
 
-        Assert.Equal(["TOYOTA", "HONDA"], makes.Select(m => m.Name));
         Assert.Equal([448, 474], makes.Select(m => m.Id));
+        Assert.Equal(["TOYOTA", "HONDA"], makes.Select(m => m.Name));
     }
 
     [Fact]
     public async Task GetModelsAsync_RemovesDuplicateModels()
     {
-        var (dataSource, _) = CreateDataSource(JsonResponse("""
+        var (dataSource, _) = CreateDataSource("""
             {"Results":[
               {"Model_ID":1861,"Model_Name":"Accord"},
               {"Model_ID":1861,"Model_Name":"Accord"},
               {"Model_ID":1863,"Model_Name":"Civic"}
             ]}
-            """));
+            """);
 
         var models = await dataSource.GetModelsAsync(474, 2015, null);
 
@@ -42,21 +37,9 @@ public class VpicVehicleDataSourceTests
     }
 
     [Fact]
-    public async Task GetModelsAsync_WithVehicleType_EscapesItInTheUrl()
+    public async Task GetModelsAsync_WithoutVehicleType_CallsMakeAndYearEndpoint()
     {
-        var (dataSource, handler) = CreateDataSource(JsonResponse("""{"Results":[]}"""));
-
-        await dataSource.GetModelsAsync(474, 2015, "Passenger Car");
-
-        Assert.Equal(
-            "https://vpic.test/api/vehicles/GetModelsForMakeIdYear/makeId/474/modelyear/2015/vehicletype/Passenger%20Car?format=json",
-            handler.LastRequestUrl);
-    }
-
-    [Fact]
-    public async Task GetModelsAsync_WithoutVehicleType_UsesMakeAndYearEndpoint()
-    {
-        var (dataSource, handler) = CreateDataSource(JsonResponse("""{"Results":[]}"""));
+        var (dataSource, handler) = CreateDataSource("""{"Results":[]}""");
 
         await dataSource.GetModelsAsync(474, 2015, null);
 
@@ -66,9 +49,21 @@ public class VpicVehicleDataSourceTests
     }
 
     [Fact]
+    public async Task GetModelsAsync_WithVehicleType_AddsItToTheUrl()
+    {
+        var (dataSource, handler) = CreateDataSource("""{"Results":[]}""");
+
+        await dataSource.GetModelsAsync(474, 2015, "Passenger Car");
+
+        Assert.Equal(
+            "https://vpic.test/api/vehicles/GetModelsForMakeIdYear/makeId/474/modelyear/2015/vehicletype/Passenger%20Car?format=json",
+            handler.LastRequestUrl);
+    }
+
+    [Fact]
     public async Task ServerError_ThrowsExternalServiceException()
     {
-        var (dataSource, _) = CreateDataSource(new HttpResponseMessage(HttpStatusCode.InternalServerError));
+        var (dataSource, _) = CreateDataSource("error", HttpStatusCode.InternalServerError);
 
         await Assert.ThrowsAsync<ExternalServiceException>(() => dataSource.GetMakesAsync());
     }
@@ -76,38 +71,30 @@ public class VpicVehicleDataSourceTests
     [Fact]
     public async Task HtmlInsteadOfJson_ThrowsExternalServiceException()
     {
-        var (dataSource, _) = CreateDataSource(new HttpResponseMessage(HttpStatusCode.OK)
-        {
-            Content = new StringContent("<html>Service Unavailable</html>", Encoding.UTF8, "application/json"),
-        });
+        var (dataSource, _) = CreateDataSource("<html>Service Unavailable</html>");
 
         await Assert.ThrowsAsync<ExternalServiceException>(() => dataSource.GetMakesAsync());
     }
 
-    private static HttpResponseMessage JsonResponse(string json)
+    private static (VpicVehicleDataSource DataSource, FakeHttpHandler Handler) CreateDataSource(
+        string responseBody, HttpStatusCode statusCode = HttpStatusCode.OK)
     {
-        return new HttpResponseMessage(HttpStatusCode.OK)
-        {
-            Content = new StringContent(json, Encoding.UTF8, "application/json"),
-        };
-    }
-
-    private static (VpicVehicleDataSource DataSource, StubHttpHandler Handler) CreateDataSource(HttpResponseMessage response)
-    {
-        var handler = new StubHttpHandler(response);
+        var handler = new FakeHttpHandler(responseBody, statusCode);
         var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://vpic.test/api/vehicles/") };
-        var dataSource = new VpicVehicleDataSource(httpClient, NullLogger<VpicVehicleDataSource>.Instance);
 
-        return (dataSource, handler);
+        return (new VpicVehicleDataSource(httpClient), handler);
     }
 
-    private class StubHttpHandler : HttpMessageHandler
+    // Returns a fixed response and remembers the URL that was requested.
+    private class FakeHttpHandler : HttpMessageHandler
     {
-        private readonly HttpResponseMessage _response;
+        private readonly string _responseBody;
+        private readonly HttpStatusCode _statusCode;
 
-        public StubHttpHandler(HttpResponseMessage response)
+        public FakeHttpHandler(string responseBody, HttpStatusCode statusCode)
         {
-            _response = response;
+            _responseBody = responseBody;
+            _statusCode = statusCode;
         }
 
         public string? LastRequestUrl { get; private set; }
@@ -115,7 +102,11 @@ public class VpicVehicleDataSourceTests
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             LastRequestUrl = request.RequestUri?.AbsoluteUri;
-            return Task.FromResult(_response);
+
+            return Task.FromResult(new HttpResponseMessage(_statusCode)
+            {
+                Content = new StringContent(_responseBody, Encoding.UTF8, "application/json"),
+            });
         }
     }
 }

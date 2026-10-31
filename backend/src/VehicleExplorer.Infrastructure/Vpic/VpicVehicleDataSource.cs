@@ -1,7 +1,5 @@
 using System.Net.Http.Json;
 using System.Text.Json;
-using Microsoft.Extensions.Logging;
-using Polly;
 using VehicleExplorer.Application.Exceptions;
 using VehicleExplorer.Application.Interfaces;
 using VehicleExplorer.Domain.Entities;
@@ -10,27 +8,23 @@ namespace VehicleExplorer.Infrastructure.Vpic;
 
 /// <summary>
 /// Reads vehicle data from the NHTSA vPIC API and maps it to domain entities.
-/// Retries, timeouts and the circuit breaker are configured on the HttpClient in DependencyInjection.cs.
 /// </summary>
 public class VpicVehicleDataSource : IVehicleDataSource
 {
     private readonly HttpClient _httpClient;
-    private readonly ILogger<VpicVehicleDataSource> _logger;
 
-    public VpicVehicleDataSource(HttpClient httpClient, ILogger<VpicVehicleDataSource> logger)
+    public VpicVehicleDataSource(HttpClient httpClient)
     {
         _httpClient = httpClient;
-        _logger = logger;
     }
 
     public async Task<IReadOnlyList<Make>> GetMakesAsync(CancellationToken cancellationToken = default)
     {
         var results = await GetResultsAsync<VpicMakeResult>("getallmakes?format=json", cancellationToken);
 
+        // Some vPIC make names have leading or trailing spaces.
         return results
-            .Where(r => !string.IsNullOrWhiteSpace(r.MakeName))
-            .DistinctBy(r => r.MakeId)
-            .Select(r => new Make { Id = r.MakeId, Name = r.MakeName!.Trim() })
+            .Select(r => new Make { Id = r.MakeId, Name = r.MakeName?.Trim() ?? string.Empty })
             .ToList();
     }
 
@@ -40,9 +34,7 @@ public class VpicVehicleDataSource : IVehicleDataSource
             $"GetVehicleTypesForMakeId/{makeId}?format=json", cancellationToken);
 
         return results
-            .Where(r => !string.IsNullOrWhiteSpace(r.VehicleTypeName))
-            .DistinctBy(r => r.VehicleTypeId)
-            .Select(r => new VehicleType { Id = r.VehicleTypeId, Name = r.VehicleTypeName!.Trim() })
+            .Select(r => new VehicleType { Id = r.VehicleTypeId, Name = r.VehicleTypeName ?? string.Empty })
             .ToList();
     }
 
@@ -57,26 +49,24 @@ public class VpicVehicleDataSource : IVehicleDataSource
 
         var results = await GetResultsAsync<VpicModelResult>($"{url}?format=json", cancellationToken);
 
+        // vPIC can return the same model more than once.
         return results
-            .Where(r => !string.IsNullOrWhiteSpace(r.ModelName))
             .DistinctBy(r => r.ModelId)
-            .Select(r => new VehicleModel { Id = r.ModelId, Name = r.ModelName!.Trim() })
+            .Select(r => new VehicleModel { Id = r.ModelId, Name = r.ModelName ?? string.Empty })
             .ToList();
     }
 
-    private async Task<List<T>> GetResultsAsync<T>(string relativeUrl, CancellationToken cancellationToken)
+    private async Task<List<T>> GetResultsAsync<T>(string url, CancellationToken cancellationToken)
     {
         try
         {
-            var response = await _httpClient.GetFromJsonAsync<VpicResponse<T>>(relativeUrl, cancellationToken);
+            var response = await _httpClient.GetFromJsonAsync<VpicResponse<T>>(url, cancellationToken);
             return response?.Results ?? [];
         }
-        catch (Exception ex) when (ex is HttpRequestException or JsonException or ExecutionRejectedException)
+        catch (Exception ex) when (ex is HttpRequestException or JsonException)
         {
-            // HttpRequestException: network error or non-success status code.
+            // HttpRequestException: network error or error status code.
             // JsonException: vPIC sometimes answers with an HTML error page.
-            // ExecutionRejectedException: Polly timeout or open circuit breaker.
-            _logger.LogWarning(ex, "Request to vPIC failed: {Url}", relativeUrl);
             throw new ExternalServiceException("The NHTSA vPIC service is unavailable.", ex);
         }
     }

@@ -4,26 +4,24 @@ namespace VehicleExplorer.Tests.Domain;
 
 public class ModelYearsTests
 {
-    private static readonly DateTimeOffset Now = new(2026, 10, 30, 0, 0, 0, TimeSpan.Zero);
+    private static readonly int NextYear = DateTime.UtcNow.Year + 1;
 
-    [Theory]
-    [InlineData(1980, false)]
-    [InlineData(1981, true)]
-    [InlineData(2026, true)]
-    [InlineData(2027, true)] // next year's models are already on sale
-    [InlineData(2028, false)]
-    public void IsValid_AcceptsYearsFrom1981ToNextYear(int year, bool expected)
+    [Fact]
+    public void IsValid_AcceptsYearsFrom1981ToNextYear()
     {
-        Assert.Equal(expected, ModelYears.IsValid(year, Now));
+        Assert.True(ModelYears.IsValid(1981));
+        Assert.True(ModelYears.IsValid(NextYear));
+
+        Assert.False(ModelYears.IsValid(1980));
+        Assert.False(ModelYears.IsValid(NextYear + 1));
     }
 
     [Fact]
     public void All_ReturnsEveryValidYearNewestFirst()
     {
-        var years = ModelYears.All(Now);
+        var years = ModelYears.All();
 
-        Assert.Equal(2027, years[0]);
+        Assert.Equal(NextYear, years[0]);
         Assert.Equal(1981, years[^1]);
-        Assert.Equal(2027 - 1981 + 1, years.Count);
     }
 }
