@@ -1,28 +1,21 @@
-@use '@angular/material' as mat;
-
-html {
-  height: 100%;
-  color-scheme: light;
-
-  @include mat.theme(
-    (
-      color: (
-        primary: mat.$azure-palette,
-        tertiary: mat.$violet-palette,
-      ),
-      typography: (
-        plain-family: 'Inter, Roboto, sans-serif',
-        brand-family: 'Inter, Roboto, sans-serif',
-      ),
-      density: 0,
-    )
-  );
+body {
+  margin: 0;
+  background: #f1f5f9;
+  color: #0f172a;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
 }
 
-body {
-  height: 100%;
-  margin: 0;
-  background-color: #f4f6fb;
-  color: var(--mat-sys-on-surface);
-  font: var(--mat-sys-body-medium);
+button {
+  padding: 8px 14px;
+  border: none;
+  border-radius: 8px;
+  background: #1e40af;
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
 }

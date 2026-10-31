@@ -50,18 +50,15 @@ API contracts (`MakeDto`, `VehicleTypeDto`, `VehicleModelDto`) are classes with 
 - `GetOrCreateAsync` with one duration for everything. Failed calls are not cached, because an exception means nothing is stored.
 - **Trade-off:** the first request after startup, or after expiry, still waits for vPIC. The cache is also per instance, which is fine for one container.
 
-### Make search runs in the browser
-- The client downloads the make list once and filters it locally. Prefix matches rank first, and the list is capped at 50 suggestions. Search is instant, with no request per keystroke.
-- With an empty search box the app suggests **popular makes**. vPIC's alphabetical list starts with entries like "#1 ALPINE CUSTOMS", which is not a useful starting point.
+### Angular: one component, one service, direct API calls
+- `VehicleService` wraps the four API calls with `HttpClient`. The `App` component calls it from its event handlers (`onMakeChange`, `onYearChange`, `onVehicleTypeChange`) and stores the results in signals. Signals are needed because the app is zoneless (the Angular 22 default), so the screen updates when a signal changes.
+- Before a new models request, the previous one is unsubscribed, which cancels it. That way a slow old response can't replace a newer one.
+- No store, no routing, no shared folders. The whole page is `app.ts` (~120 lines) plus its template.
 
-### Angular: a plain service plus signals
-- `VehicleService` is an ordinary `HttpClient` service that returns Observables.
-- The page component keeps the selection in signals and loads data with `rxResource` (stable in Angular 22). When the make or year changes, the data reloads and the previous request is **cancelled**, so a slow old response can't overwrite a newer one. There is no separate store.
-- The UI shows loading skeletons, guided empty states, and an error alert with **Try again**.
-
-### UI library: Angular Material, not PrimeNG
-- Recent PrimeNG releases (including 20–22) are under a commercial **PrimeUI License** that requires a license key. Without a key the app shows a license banner, and a key would have to sit in the frontend code of a public repository.
-- Angular Material is MIT-licensed, maintained by the Angular team, and has the accessible autocomplete, select and chips this page needs.
+### Plain HTML instead of a UI library
+- **Make:** a text input with a `<datalist>` of all 12,416 makes. The browser does the type-to-search, so there is no autocomplete code. The selected name is matched back to its id; I checked that make names are unique. The trade-off is that the suggestion list looks slightly different in each browser.
+- **Model year** and **vehicle type** are plain `<select>` elements.
+- No Angular Material or PrimeNG. The bundle is ~41 KB transferred, and there are no extra APIs to learn when changing the UI. I also checked PrimeNG: recent releases need a commercial PrimeUI license key, which ruled it out for a public repository.
 
 ### One container for UI and API
 - The Dockerfile builds Angular, publishes .NET, and copies the Angular output into `wwwroot`. Same origin means no CORS setup, and there is one artifact to deploy.
@@ -79,11 +76,11 @@ API contracts (`MakeDto`, `VehicleTypeDto`, `VehicleModelDto`) are classes with 
 
 ## How I used AI
 
-I built this with **Claude Code** (Claude Opus) as a pair programmer. It scaffolded the projects, drafted most of the code and tests, and drafted these docs. I set the direction, reviewed every change, ran the app against the live API, and made the structural calls. One of those calls was cutting the AI's first version down: it had added retries, cache warm-up, compression and other production extras that the brief didn't ask for and that made the code harder to change.
+I built this with **Claude Code** (Claude Opus) as a pair programmer. It scaffolded the projects, drafted most of the code and tests, and drafted these docs. I set the direction, reviewed every change, ran the app against the live API, and made the structural calls. One of those calls was cutting the AI's first version down. It had added retries, cache warm-up, compression and a UI component library: production extras the brief didn't ask for, which made the code harder to change. I asked for the simplest version that meets the requirements.
 
 **What it got wrong, and how it was fixed:**
 
-1. **An Angular test that hung.** The first component test awaited `fixture.whenStable()` *before* flushing the mocked HTTP requests, and timed out after 5 s. In Angular 22, pending resource requests count as pending work, so the app is never "stable" until they are answered. The fix: run change detection, flush the requests, then await stability. The specs have a comment explaining why.
+1. **An Angular test that hung.** In an earlier version of the frontend, a component test awaited `fixture.whenStable()` *before* flushing the mocked HTTP requests, and timed out after 5 s. Pending HTTP requests count as pending work, so the app is never "stable" until they are answered. The fix was to flush the requests first and then await stability. The current tests follow the same order.
 2. **`[ResponseCache(VaryByQueryKeys = …)]` without the middleware.** The AI used `VaryByQueryKeys`, which only works with the Response Caching middleware; without it, ASP.NET Core throws at request time. I caught it in review before it ever ran.
 3. **A dependency in the wrong package.** The AI referenced `Microsoft.Extensions.Caching.Abstractions` but called `AddMemoryCache()`, which lives in `Microsoft.Extensions.Caching.Memory`. It was fixed before the first build.
 

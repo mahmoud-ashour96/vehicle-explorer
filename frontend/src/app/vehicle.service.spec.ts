@@ -30,7 +30,7 @@ describe('VehicleService', () => {
   });
 
   it('sends only the year when no vehicle type is chosen', () => {
-    service.getModels(474, 2015).subscribe();
+    service.getModels(474, 2015, '').subscribe();
 
     const request = http.expectOne((r) => r.url === '/api/makes/474/models');
     expect(request.request.params.get('year')).toBe('2015');

@@ -1,19 +1,73 @@
-<header class="hero">
-  <div class="container">
-    <div class="brand">
-      <span class="brand-icon"><mat-icon>garage</mat-icon></span>
-      <span class="brand-name">Vehicle Explorer</span>
-    </div>
-    <h1>Explore vehicle models by make and year</h1>
-    <p>Official data from the U.S. National Highway Traffic Safety Administration.</p>
-  </div>
+<header>
+  <h1>Vehicle Explorer</h1>
+  <p>Pick a make and a model year to see the vehicle types and models.</p>
 </header>
 
-<main class="container">
-  <app-vehicle-explorer />
-</main>
+<main>
+  <section class="filters">
+    <label>
+      Make
+      <input
+        #makeInput
+        list="make-list"
+        autocomplete="off"
+        [placeholder]="makes().length ? 'Type a make, e.g. Honda' : 'Loading makes…'"
+        [disabled]="!makes().length"
+        (input)="onMakeChange(makeInput.value)"
+      />
+      <datalist id="make-list">
+        @for (make of makes(); track make.id) {
+          <option [value]="make.name"></option>
+        }
+      </datalist>
+    </label>
 
-<footer class="container">
-  Data from the
-  <a href="https://vpic.nhtsa.dot.gov/api/" target="_blank" rel="noopener">NHTSA vPIC API</a>.
-</footer>
+    <label>
+      Model year
+      <select #yearSelect (change)="onYearChange(yearSelect.value)">
+        <option value="">Select a year</option>
+        @for (year of years(); track year) {
+          <option [value]="year">{{ year }}</option>
+        }
+      </select>
+    </label>
+
+    <label>
+      Vehicle type
+      <select
+        #typeSelect
+        [disabled]="!selectedMake()"
+        (change)="onVehicleTypeChange(typeSelect.value)"
+      >
+        <option value="" [selected]="selectedVehicleType() === ''">All types</option>
+        @for (type of vehicleTypes(); track type.id) {
+          <option [value]="type.name">{{ type.name }}</option>
+        }
+      </select>
+    </label>
+  </section>
+
+  @if (error()) {
+    <div class="error">
+      {{ error() }}
+      <button type="button" (click)="retry()">Try again</button>
+    </div>
+  }
+
+  <section class="results">
+    @if (!selectedMake() || !selectedYear()) {
+      <p class="message">Choose a make and a model year.</p>
+    } @else if (loading()) {
+      <p class="message">Loading models…</p>
+    } @else if (!error() && models().length === 0) {
+      <p class="message">No models found.</p>
+    } @else if (models().length) {
+      <h2>{{ selectedMake()?.name }} {{ selectedYear() }} ({{ models().length }} found)</h2>
+      <ul>
+        @for (model of models(); track model.id) {
+          <li>{{ model.name }}</li>
+        }
+      </ul>
+    }
+  </section>
+</main>

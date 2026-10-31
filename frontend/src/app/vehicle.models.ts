@@ -1,4 +1,4 @@
-// Match the DTOs returned by the API (backend/src/VehicleExplorer.Application/Dtos).
+// Same shape as the API's DTOs (backend/src/VehicleExplorer.Application/Dtos).
 
 export interface Make {
   id: number;
