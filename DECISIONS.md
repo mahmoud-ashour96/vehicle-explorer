@@ -50,10 +50,11 @@ API contracts (`MakeDto`, `VehicleTypeDto`, `VehicleModelDto`) are classes with 
 - `GetOrCreateAsync` with one duration for everything. Failed calls are not cached, because an exception means nothing is stored.
 - **Trade-off:** the first request after startup, or after expiry, still waits for vPIC. The cache is also per instance, which is fine for one container.
 
-### Angular: one component, one service, direct API calls
-- `VehicleService` wraps the four API calls with `HttpClient`. The `App` component calls it from its event handlers (`onMakeChange`, `onYearChange`, `onVehicleTypeChange`) and stores the results in signals. Signals are needed because the app is zoneless (the Angular 22 default), so the screen updates when a signal changes.
+### Angular: one feature component, one service, direct API calls
+- `App` is only the page layout (header + `<app-vehicle-explorer>`). All the logic is in the `VehicleExplorer` component.
+- `VehicleService` wraps the four API calls with `HttpClient`. `VehicleExplorer` calls it from its event handlers (`onMakeChange`, `onYearChange`, `onVehicleTypeChange`) and stores the results in signals. Signals are needed because the app is zoneless (the Angular 22 default), so the screen updates when a signal changes.
 - Before a new models request, the previous one is unsubscribed, which cancels it. That way a slow old response can't replace a newer one.
-- No store, no routing, no shared folders. The whole page is `app.ts` (~120 lines) plus its template.
+- No store, no routing, no shared folders. The whole feature is `vehicle-explorer.ts` (~120 lines) plus its template.
 
 ### Plain HTML instead of a UI library
 - **Make:** a text input with a `<datalist>` of all 12,416 makes. The browser does the type-to-search, so there is no autocomplete code. The selected name is matched back to its id; I checked that make names are unique. The trade-off is that the suggestion list looks slightly different in each browser.

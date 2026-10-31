@@ -8,7 +8,7 @@ Data comes from the [NHTSA vPIC API](https://vpic.nhtsa.dot.gov/api/).
 | Layer    | Tech                                                                                      |
 | -------- | ----------------------------------------------------------------------------------------- |
 | Backend  | .NET 10 ASP.NET Core Web API, onion layers (Domain / Application / Infrastructure / Api) |
-| Frontend | Angular 22, one component + one service, plain HTML/CSS (no UI library)                  |
+| Frontend | Angular 22, a VehicleExplorer component + VehicleService, plain HTML/CSS (no UI library) |
 | Tests    | xUnit + `WebApplicationFactory` (backend), Vitest (frontend)                              |
 | Delivery | Docker (single image), GitHub Actions → GHCR, AWS EC2 (Free Tier)                         |
 
@@ -102,7 +102,8 @@ backend/
   tests/
     VehicleExplorer.Tests/            Domain, Application, Infrastructure and Api tests
 frontend/src/app/
-  app.ts / app.html / app.scss        The page: make, year and vehicle type pickers, and the results
+  app.ts / app.html                   Page layout: header + <app-vehicle-explorer>
+  vehicle-explorer/                   VehicleExplorer component: make, year and type pickers, and the results
   vehicle.service.ts                  Calls the API with HttpClient
   vehicle.models.ts                   Make, VehicleType, VehicleModel interfaces
 deploy/                               EC2 user data and update scripts
