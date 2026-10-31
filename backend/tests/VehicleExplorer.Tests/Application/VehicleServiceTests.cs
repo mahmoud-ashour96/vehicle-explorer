@@ -37,7 +37,7 @@ public class VehicleServiceTests
     {
         var models = await _service.GetModelsAsync(474, 2015, "Passenger Car");
 
-        Assert.Equal(["Accord", "Civic"], models.Select(m => m.Name));
+        Assert.Equal(["Accord", "Civic", "CR-Z"], models.Select(m => m.Name));
         Assert.Equal((474, 2015, "Passenger Car"), _dataSource.LastModelsRequest);
     }
 

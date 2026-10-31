@@ -25,6 +25,7 @@ public class FakeVehicleDataSource : IVehicleDataSource
     [
         new VehicleModel { Id = 1863, Name = "Civic" },
         new VehicleModel { Id = 1861, Name = "Accord" },
+        new VehicleModel { Id = 2128, Name = "CR-Z" }, // sorts after "Civic" only when sorting ignores case
     ];
 
     public bool ShouldFail { get; set; }

@@ -67,8 +67,10 @@ API contracts (`MakeDto`, `VehicleTypeDto`, `VehicleModelDto`) are classes with 
 
 ### Delivery and AWS
 - GitHub Actions runs both test suites and builds the image. On `main` it pushes the image to GHCR using the built-in `GITHUB_TOKEN`, so no secrets are stored.
-- An EC2 `t3.micro` (Free Tier) pulls and runs the image. Building on the instance would be risky with 1 GB of RAM.
+- An EC2 `t3.micro` in `eu-north-1` (the project's Region, on the AWS Free plan) pulls and runs the image. Building on the instance would be risky with 1 GB of RAM.
 - The security group opens **only port 80**. Access to the instance goes through **SSM Session Manager**, so there is no SSH port and no key pair. No credentials are in the repository.
+- The instance requires IMDSv2, its disk is encrypted, and it uses `standard` CPU credits, so a CPU spike can't create surprise charges.
+- **Trade-off:** plain HTTP on the instance's public DNS name. HTTPS would need a domain and a certificate (for example CloudFront or a load balancer with ACM), which is in Next steps.
 
 ## Assumptions
 - Vehicle types belong to a make, not to a make and year, because vPIC's endpoint takes no year. They appear as soon as a make is chosen and act as an optional filter on the models.
@@ -84,6 +86,7 @@ I built this with **Claude Code** (Claude Opus) as a pair programmer. It scaffol
 1. **An Angular test that hung.** In an earlier version of the frontend, a component test awaited `fixture.whenStable()` *before* flushing the mocked HTTP requests, and timed out after 5 s. Pending HTTP requests count as pending work, so the app is never "stable" until they are answered. The fix was to flush the requests first and then await stability. The current tests follow the same order.
 2. **`[ResponseCache(VaryByQueryKeys = …)]` without the middleware.** The AI used `VaryByQueryKeys`, which only works with the Response Caching middleware; without it, ASP.NET Core throws at request time. I caught it in review before it ever ran.
 3. **A dependency in the wrong package.** The AI referenced `Microsoft.Extensions.Caching.Abstractions` but called `AddMemoryCache()`, which lives in `Microsoft.Extensions.Caching.Memory`. It was fixed before the first build.
+4. **Sorting that changed between my machine and AWS.** While simplifying `VehicleService`, the AI replaced `OrderBy(name, StringComparer.OrdinalIgnoreCase)` with a plain `OrderBy(name)`. On Windows that looked right, but the Alpine container runs in invariant-globalization mode, where the default comparison is case-sensitive. On the live site, Honda's models came back as "Accord, CR-Z, Civic, Fit". I spotted it while checking the deployment and restored the explicit comparer. A test now includes "CR-Z" so the order can't silently regress.
 
 ## Next steps
 - **Resilience:** retries with backoff, a timeout and a circuit breaker on the vPIC `HttpClient` (`AddStandardResilienceHandler`).

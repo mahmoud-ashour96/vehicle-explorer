@@ -60,7 +60,7 @@ public class MakesApiTests : IDisposable
         var models = await _client.GetFromJsonAsync<List<VehicleModelDto>>(
             "/api/makes/474/models?year=2015&vehicleType=Passenger%20Car");
 
-        Assert.Equal(["Accord", "Civic"], models!.Select(m => m.Name));
+        Assert.Equal(["Accord", "Civic", "CR-Z"], models!.Select(m => m.Name));
         Assert.Equal((474, 2015, "Passenger Car"), _dataSource.LastModelsRequest);
     }
 

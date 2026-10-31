@@ -29,7 +29,7 @@ public class VehicleService : IVehicleService
             return _dataSource.GetMakesAsync(cancellationToken);
         });
 
-        return makes!.OrderBy(m => m.Name).Select(m => m.ToDto()).ToList();
+        return makes!.OrderBy(m => m.Name, StringComparer.OrdinalIgnoreCase).Select(m => m.ToDto()).ToList();
     }
 
     public IReadOnlyList<int> GetModelYears()
@@ -45,7 +45,7 @@ public class VehicleService : IVehicleService
             return _dataSource.GetVehicleTypesAsync(makeId, cancellationToken);
         });
 
-        return vehicleTypes!.OrderBy(t => t.Name).Select(t => t.ToDto()).ToList();
+        return vehicleTypes!.OrderBy(t => t.Name, StringComparer.OrdinalIgnoreCase).Select(t => t.ToDto()).ToList();
     }
 
     public async Task<IReadOnlyList<VehicleModelDto>> GetModelsAsync(
@@ -62,6 +62,6 @@ public class VehicleService : IVehicleService
             return _dataSource.GetModelsAsync(makeId, year, vehicleType, cancellationToken);
         });
 
-        return models!.OrderBy(m => m.Name).Select(m => m.ToDto()).ToList();
+        return models!.OrderBy(m => m.Name, StringComparer.OrdinalIgnoreCase).Select(m => m.ToDto()).ToList();
     }
 }

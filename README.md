@@ -3,7 +3,7 @@
 Pick a car make and a model year, then see the matching vehicle types and models.
 Data comes from the [NHTSA vPIC API](https://vpic.nhtsa.dot.gov/api/).
 
-**Live demo:** _AWS link goes here_
+**Live demo:** http://ec2-13-62-55-124.eu-north-1.compute.amazonaws.com
 
 | Layer    | Tech                                                                                      |
 | -------- | ----------------------------------------------------------------------------------------- |
