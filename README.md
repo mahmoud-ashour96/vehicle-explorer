@@ -118,7 +118,7 @@ Dependencies point inwards: `Api → Infrastructure → Application → Domain`.
 
 CI publishes the image to `ghcr.io/<owner>/vehicle-explorer` from `main`. The live demo runs that image on an EC2 `t3.micro` (Free Tier):
 
-1. In GitHub, open **Packages → vehicle-explorer → Package settings** and set the visibility to **Public**, so EC2 can pull the image without credentials.
+1. Check that the image is public: **Packages → vehicle-explorer** in the GitHub repository. It inherits the repository's public visibility, so EC2 can pull it without credentials.
 2. Launch an EC2 instance: Amazon Linux 2023, `t3.micro`, with a security group that allows inbound **HTTP (80)** only. Attach an IAM role with `AmazonSSMManagedInstanceCore`, so you can connect with Session Manager instead of opening SSH.
 3. Paste `deploy/ec2-user-data.sh` into **Advanced details → User data**.
 4. After a minute or two, open `http://<instance-public-dns>`.
