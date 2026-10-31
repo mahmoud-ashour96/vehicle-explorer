@@ -2,7 +2,7 @@
 # Run on the EC2 instance (via SSM Session Manager) to deploy the latest image published by CI.
 set -euo pipefail
 
-IMAGE="${1:-ghcr.io/OWNER/vehicle-explorer:latest}"
+IMAGE="${1:-ghcr.io/mahmoud-ashour96/vehicle-explorer:latest}"
 
 docker pull "$IMAGE"
 docker rm -f vehicle-explorer 2>/dev/null || true

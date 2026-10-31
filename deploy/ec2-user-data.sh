@@ -1,10 +1,9 @@
 #!/bin/bash
 # EC2 user data for Amazon Linux 2023: installs Docker and runs the image that CI publishes to GHCR.
 # Paste this into "Advanced details -> User data" when launching the instance.
-# Replace OWNER with your GitHub username (lowercase).
 set -euxo pipefail
 
-IMAGE="ghcr.io/OWNER/vehicle-explorer:latest"
+IMAGE="ghcr.io/mahmoud-ashour96/vehicle-explorer:latest"
 
 dnf install -y docker
 systemctl enable --now docker

@@ -23,7 +23,7 @@ Design decisions, trade-offs and how AI was used are in [DECISIONS.md](DECISIONS
 Prerequisite: [Docker Desktop](https://www.docker.com/products/docker-desktop/) (or any Docker engine with Compose).
 
 ```bash
-git clone https://github.com/<your-username>/vehicle-explorer.git
+git clone https://github.com/mahmoud-ashour96/vehicle-explorer.git
 cd vehicle-explorer
 docker compose up --build
 ```
@@ -120,7 +120,7 @@ CI publishes the image to `ghcr.io/<owner>/vehicle-explorer` from `main`. The li
 
 1. In GitHub, open **Packages → vehicle-explorer → Package settings** and set the visibility to **Public**, so EC2 can pull the image without credentials.
 2. Launch an EC2 instance: Amazon Linux 2023, `t3.micro`, with a security group that allows inbound **HTTP (80)** only. Attach an IAM role with `AmazonSSMManagedInstanceCore`, so you can connect with Session Manager instead of opening SSH.
-3. Paste `deploy/ec2-user-data.sh` into **Advanced details → User data**, after replacing `OWNER` with your GitHub username.
+3. Paste `deploy/ec2-user-data.sh` into **Advanced details → User data**.
 4. After a minute or two, open `http://<instance-public-dns>`.
 
 To roll out a new version, connect with Session Manager and run `deploy/update.sh`.
